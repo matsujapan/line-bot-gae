@@ -1,0 +1,9 @@
+queue:
+- name: default
+  rate: 1/s
+- name: receive
+  rate: 1/s
+- name: parse
+  rate: 1/s
+- name: send
+  rate: 1/s
