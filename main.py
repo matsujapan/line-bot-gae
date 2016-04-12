@@ -33,7 +33,59 @@ from datetime import datetime, timedelta, tzinfo
 
 LINE_ENDPOINT = 'https://trialbot-api.line.me' # given value by LINE. This should be changed in future?
 
+"""
+Datastore configurations
+"""
 
+class Setting(ndb.Model):
+    name = ndb.StringProperty(indexed=True)
+    value = ndb.StringProperty(indexed=True)
+
+class Signature(ndb.Model):
+    given = ndb.TextProperty()
+    calcurated = ndb.TextProperty()
+    is_valid = ndb.BooleanProperty()
+    address = ndb.StringProperty()
+    created_at = ndb.DateTimeProperty(auto_now_add=True)
+
+    @classmethod
+    def create(self, given, body, address):
+        calcurated = hmac.new(str(Setting.get_by_id('channel_secret').value), body, hashlib.sha256).digest().encode('base64').rstrip()
+        is_valid = False
+        if given == calcurated:
+            is_valid = True
+        signature = Signature(given=given, calcurated=calcurated, is_valid=is_valid, address=address)
+        signature.put()
+        return signature
+
+class Message(ndb.Model):
+    text = ndb.TextProperty()
+    sender = ndb.StringProperty(indexed=True)
+    content_from = ndb.StringProperty(indexed=True)
+    created_at = ndb.DateTimeProperty(auto_now_add=True)
+    body = ndb.TextProperty()
+
+    @classmethod
+    def create(self, string):
+        params = json.loads(string)
+        message = Message.get_or_insert(params['id'])
+        message.text = params['content']['text']
+
+        # for getting stamp's text.
+        # if message.text is None:
+        #     message.text = params['content']['contentMetadata']['STKTXT']
+
+        message.sender = params['from']
+        message.content_from = params['content']['from']
+        message.body = string # mainly for debug.
+        message.put()
+
+        taskqueue.add(queue_name='send', url='/tasks/generate', params={'to': params['content']['from'], 'text': message.text})
+
+
+"""
+tzinfo for Japanese Standard Time
+"""
 class JST(tzinfo):
     def utcoffset(self, dt):
         return timedelta(hours=9)
@@ -44,6 +96,9 @@ class JST(tzinfo):
     def tzname(self, dt):
         return 'JST'
 
+"""
+functions
+"""
 def _get_price(text):
     try:
         q = jsm.Quotes()
@@ -118,56 +173,9 @@ def _send_message(to, output):
     logging.debug(result.content)
     pass
 
-
-class Setting(ndb.Model):
-    name = ndb.StringProperty()
-    value = ndb.StringProperty()
-
-class Signature(ndb.Model):
-    given = ndb.TextProperty()
-    calcurated = ndb.TextProperty()
-    is_valid = ndb.BooleanProperty()
-    address = ndb.StringProperty()
-    created_at = ndb.DateTimeProperty(auto_now_add=True)
-
-    @classmethod
-    def create(self, given, body, address):
-        calcurated = hmac.new(str(Setting.get_by_id('channel_secret').value), body, hashlib.sha256).digest().encode('base64').rstrip()
-        is_valid = False
-        if given == calcurated:
-            is_valid = True
-        signature = Signature(given=given, calcurated=calcurated, is_valid=is_valid, address=address)
-        signature.put()
-        return signature
-
-class Message(ndb.Model):
-    text = ndb.TextProperty()
-    sender = ndb.StringProperty(indexed=True)
-    content_from = ndb.StringProperty(indexed=True)
-    created_at = ndb.DateTimeProperty(auto_now_add=True)
-    body = ndb.TextProperty()
-
-    @classmethod
-    def create(self, string):
-        params = json.loads(string)
-        message = Message.get_or_insert(params['id'])
-        message.text = params['content']['text']
-
-        # for getting stamp's text.
-        # if message.text is None:
-        #     message.text = params['content']['contentMetadata']['STKTXT']
-
-        message.sender = params['from']
-        message.content_from = params['content']['from']
-        message.body = string # mainly for debug.
-        message.put()
-
-        taskqueue.add(queue_name='send', url='/tasks/generate', params={'to': params['content']['from'], 'text': message.text})
-
-
-
-
-
+"""
+HTTP Handlers
+"""
 class ConfigHandler(webapp2.RequestHandler):
     def post(self):
         response = {}
@@ -235,6 +243,9 @@ class CallbackHandler(webapp2.RequestHandler):
         taskqueue.add(queue_name='receive', url='/tasks/receive', params=params)
         self.response.write('Thanks, LINE!')
 
+"""
+Path to Handler Settings
+"""
 app = webapp2.WSGIApplication([
     ('/callback', CallbackHandler),
     ('/admin/send/(.*)/(.*)', SendHandler),
