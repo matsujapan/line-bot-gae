@@ -27,7 +27,39 @@ import hashlib
 
 from google.appengine.api import urlfetch
 
+import jsm
+import time
+from datetime import datetime, timedelta, tzinfo
+
 LINE_ENDPOINT = 'https://trialbot-api.line.me' # given value by LINE. This should be changed in future?
+
+
+class JST(tzinfo):
+    def utcoffset(self, dt):
+        return timedelta(hours=9)
+
+    def dst(self, dt):
+        return timedelta(0)
+
+    def tzname(self, dt):
+        return 'JST'
+
+def _get_price(text):
+    try:
+        q = jsm.Quotes()
+        price = q.get_price(int(text))
+        utime = int(time.mktime(price.date.timetuple()))
+        price_date = datetime.fromtimestamp(utime, JST())
+
+        return 'Stock price of {2} at {0} is JPY{1}'.format(price_date.strftime('%Y/%m/%d %H:%M:%S'), '{:,.02f}'.format(price.close), text)
+
+        """
+            for historical data
+        """
+        # prices = q.get_historical_prices(int(text), jsm.DAILY)
+        # return "\n".join(map(lambda p:"{0}\tJPY{1}".format(p.date.strftime('%Y/%m/%d'), "{:,.02f}".format(p.close)), prices))
+    except:
+        return ''
 
 
 def _get_headers():
@@ -58,7 +90,7 @@ def _get_like_content(to):
     return data
 
 def _generate_message(to, text):
-    output = text # you can make any output with the input text like getting a search result with with the input text as a query.
+    output = _get_price(text) # you can make any output with the input text like getting a search result with with the input text as a query.
     taskqueue.add(queue_name='send', url='/tasks/send', params={'to': to, 'output': output})
 
 
@@ -201,7 +233,6 @@ class CallbackHandler(webapp2.RequestHandler):
         'address': self.request.remote_addr
         }
         taskqueue.add(queue_name='receive', url='/tasks/receive', params=params)
-
         self.response.write('Thanks, LINE!')
 
 app = webapp2.WSGIApplication([
