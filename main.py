@@ -187,16 +187,6 @@ class ConfigHandler(webapp2.RequestHandler):
             setting.put()
         self.response.write(json.dumps(response))
 
-class SendHandler(webapp2.RequestHandler):
-    def get(self, query, text):
-        taskqueue.add(queue_name='send', url='/tasks/send-message-with-query', params={'query': query, 'text': text})
-        self.response.write('ok')
-
-class SendMessageWithQueryHandler(webapp2.RequestHandler):
-    def post(self):
-        _send_message_with_query(self.request.get('query'), self.request.get('text'))
-        self.response.write('ok')
-
 class GenerateMessageHandler(webapp2.RequestHandler):
     def post(self):
         _generate_message(self.request.get('to'), self.request.get('text'))
@@ -248,7 +238,6 @@ Path to Handler Settings
 """
 app = webapp2.WSGIApplication([
     ('/callback', CallbackHandler),
-    ('/admin/send/(.*)/(.*)', SendHandler),
     ('/admin/config', ConfigHandler),
     ('/tasks/receive', ReceiveHandler),
     ('/tasks/parse', ParseMessageHandler),
