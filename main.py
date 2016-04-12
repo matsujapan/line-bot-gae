@@ -66,21 +66,23 @@ class Message(ndb.Model):
 
     @classmethod
     def create(self, string):
-        params = json.loads(string)
-        message = Message.get_or_insert(params['id'])
-        message.text = params['content'].get('text')
+        try:
+            params = json.loads(string)
+            message = Message.get_or_insert(params['id'])
+            message.text = params['content']['text']
 
-        # for getting stamp's text.
-        # if message.text is None:
-        #     message.text = params['content']['contentMetadata']['STKTXT']
+            # for getting stamp's text.
+            # if message.text is None:
+            #     message.text = params['content']['contentMetadata']['STKTXT']
 
-        message.sender = params['from']
-        message.content_from = params['content']['from']
-        message.body = string # mainly for debug.
-        message.put()
+            message.sender = params['from']
+            message.content_from = params['content']['from']
+            message.body = string # mainly for debug.
+            message.put()
 
-        taskqueue.add(queue_name='send', url='/tasks/generate', params={'to': params['content']['from'], 'text': message.text})
-
+            taskqueue.add(queue_name='send', url='/tasks/generate', params={'to': params['content']['from'], 'text': message.text})
+        except:
+            logging.debug(string)
 
 """
 tzinfo for Japanese Standard Time
