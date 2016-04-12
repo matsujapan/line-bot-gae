@@ -36,7 +36,6 @@ LINE_ENDPOINT = 'https://trialbot-api.line.me' # given value by LINE. This shoul
 """
 Datastore configurations
 """
-
 class Setting(ndb.Model):
     name = ndb.StringProperty(indexed=True)
     value = ndb.StringProperty(indexed=True)
@@ -69,7 +68,7 @@ class Message(ndb.Model):
     def create(self, string):
         params = json.loads(string)
         message = Message.get_or_insert(params['id'])
-        message.text = params['content']['text']
+        message.text = params['content'].get('text')
 
         # for getting stamp's text.
         # if message.text is None:
@@ -109,7 +108,7 @@ def _get_price(text):
         return 'Stock price of {2} at {0} is JPY{1}'.format(price_date.strftime('%Y/%m/%d %H:%M:%S'), '{:,.02f}'.format(price.close), text)
 
         """
-            for historical data
+        for historical data
         """
         # prices = q.get_historical_prices(int(text), jsm.DAILY)
         # return "\n".join(map(lambda p:"{0}\tJPY{1}".format(p.date.strftime('%Y/%m/%d'), "{:,.02f}".format(p.close)), prices))
@@ -219,7 +218,6 @@ class ReceiveHandler(webapp2.RequestHandler):
             # TODO handling mismatch signature error.
             pass
         self.response.write('ok')
-
 
 class CallbackHandler(webapp2.RequestHandler):
     def get(self):
