@@ -180,7 +180,7 @@ HTTP Handlers
 class ConfigHandler(webapp2.RequestHandler):
     def post(self):
         response = {}
-        for name in ['channel_id', 'channel_secret', 'mid']:
+        for name in ['channel_id', 'channel_secret', 'mid', 'fb_validation_token']:
             setting = Setting.get_or_insert(name)
             setting.name = name
             setting.value = self.request.get(name).encode('utf8')
@@ -233,10 +233,24 @@ class CallbackHandler(webapp2.RequestHandler):
         taskqueue.add(queue_name='receive', url='/tasks/receive', params=params)
         self.response.write('Thanks, LINE!')
 
+class WebhookHandler(webapp2.RequestHandler):
+    def get(self):
+        validation_token = Setting.get_by_id('fb_validation_token')
+
+        if validation_token is not None:
+            if validation_token.value == self.request.get('hub.verify_token'):
+                self.response.write(self.request.get('hub.challenge'))
+        else:
+            self.response.write('Error, wrong validation token')
+
+    def post(self):
+        pass
+
 """
 Path to Handler Settings
 """
 app = webapp2.WSGIApplication([
+    ('/webhook', WebhookHandler),
     ('/callback', CallbackHandler),
     ('/admin/config', ConfigHandler),
     ('/tasks/receive', ReceiveHandler),
